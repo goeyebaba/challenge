@@ -26,3 +26,5 @@ Normalizer.java has a few nested classes, it will generate multiple class files 
    
 ## Programmer
 [Fang Zhang](https://www.linkedin.com/in/fangtasticmrz/)
+
+Email: fangtasticmrz@gmail.com
