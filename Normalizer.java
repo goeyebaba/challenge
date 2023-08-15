@@ -9,7 +9,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.HashMap;
+import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -117,7 +118,7 @@ public class Normalizer {
 
 		//this property object is used to store the input fields order: the key is the field name, the value is the position.
 		//If the input file has a header, the order will be based on the header; otherwise it will use the default order defined in the Enum Field.
-		private Map<Field, Integer> fieldIndexMap = new HashMap<>();
+		private Map<Field, Integer> fieldIndexMap = new EnumMap<>(Field.class);
 
 		/**
 		 * Processor constructor
@@ -147,18 +148,13 @@ public class Normalizer {
 	        	//dealing with the exception where the last field is empty
 	        	if(result.length == 7 && line.trim().endsWith(","))
 	        	{
-	        		String[] newResult = new String[8];
-	        		int i;
-	        		for (i = 0; i < 7; i++) {
-	                    newResult[i] = result[i];
-	                }
-
-	        		newResult[i] = "";
+	        		String[] newResult = Arrays.copyOf(result, 8);
+	        		newResult[7] = ""; // Set the 8th element to an empty string
 	        		return newResult;
 	        	}
 
 	            handleException(lineNbr, new Exception("Invalid CSV format"));
-	            return null;
+	            return new String[0];
 	        }
 
 	        return result;
@@ -201,7 +197,7 @@ public class Normalizer {
 		 * If it is not the header, populate fieldIndexMap based on the default order defined in the Enum Field
 		 *
 		 * @param data the input string array with all the fields
-		 * @param fieldIndexMap a HashMap that will be populated with the field order information
+		 * @param fieldIndexMap a EnumMap that will be populated with the field order information
 		 * @return a boolean indicating whether the input line is the header
 		 */
 	    private boolean isTitleLine(String[] data, Map<Field, Integer> fieldIndexMap) {
@@ -227,7 +223,7 @@ public class Normalizer {
 		 * If it is the header, populate fieldIndexMap based on the header
 		 *
 		 * @param data the input string array with all the fields
-		 * @param fieldIndexMap a HashMap that will be populated with the field order information
+		 * @param fieldIndexMap a EnumMap that will be populated with the field order information
 		 * @return a boolean indicating whether the input line is the header
 		 */
 	    private boolean checkTitleLine(String[] data, Map<Field, Integer> fieldIndexMap) {
@@ -249,10 +245,7 @@ public class Normalizer {
 
 	    	}
 
-	    	if(i == 8)
-	    		return true;
-
-			return false;
+	    	return i == 8? true : false;
 		}
 
 	    /**
@@ -282,9 +275,17 @@ public class Normalizer {
     public static class Transformer {
 
     	/**
+		 * Private constructor to prevent instantiation
+		 */
+        private Transformer() {
+            // Private constructor to prevent instantiation
+            // This constructor is intentionally left empty
+        }
+
+    	/**
 		 * Normalize all the fields in an input line
 		 *
-		 * @param index HashMap indicates positions of all fields.
+		 * @param index EnumMap indicates positions of all fields.
 		 * @param data string array contains all the fields in their input order
 		 */
     	public static void transform(Map<Field, Integer> index, String[] data)
@@ -292,7 +293,7 @@ public class Normalizer {
     		for (Field field : Field.values()) {
     			int i = index.get(field);
 
-    			//dealing with the exception of field TotalDuration, this field doesn't have its corresponding transformationStrategy mapping.
+    			//dealing with the exception of field TotalDuratihttps://marketplace.eclipse.org/marketplace-client-intro?mpc_install=2568658on, this field doesn't have its corresponding transformationStrategy mapping.
     			//Since this field has dependencies on two other fields: FooDuration and BarDuration, the transform function has to be called
     			// at the line level but not individual field level.
     			if(field == Field.TOTALDURATION)
@@ -346,11 +347,11 @@ public class Normalizer {
     			if(zip.trim().isEmpty())
     				return zip;
     			else if(zip.length() > 5)
-    				throw new Exception(" '" + zip + "' is longer than 5");
+    				throw new ZipLengthException(" '" + zip + "' is longer than 5");
     			else
     				return String.format("%05d", Integer.parseInt(zip));
     		}catch(Exception ex) {
-    			throw new RuntimeException("Error parsing Zip: " + ex.getMessage());
+    			throw new ZipFormatException("Error parsing Zip: " + ex.getMessage());
     		}
 
     	}
@@ -388,9 +389,9 @@ public class Normalizer {
     				 return ZERO_STR;
 
 	    		 return convertTimeToSeconds(fooDuration);
-    		}catch(Exception ex)
+    		}catch(NumberFormatException ex)
     		{
-    			throw new RuntimeException("Error parsing FooDuration: " + ex.getMessage());
+    			throw new DurationFormatException("Error parsing FooDuration: " + ex.getMessage(), ex);
     		}
     	}
 
@@ -406,9 +407,9 @@ public class Normalizer {
    				 return ZERO_STR;
 
 	    		return convertTimeToSeconds(barDuration);
-    		}catch(Exception ex)
+    		}catch(NumberFormatException ex)
     		{
-    			throw new RuntimeException("Error parsing BarDuration: " + ex.getMessage());
+    			throw new DurationFormatException("Error parsing BarDuration: " + ex.getMessage(), ex);
     		}
     	}
 
@@ -424,9 +425,9 @@ public class Normalizer {
 	    		long foo = Long.parseLong(fooDuration);
 	    		long bar = Long.parseLong(barDuration);
 	    		return String.valueOf(foo + bar);
-    		}catch(Exception ex)
+    		}catch(NumberFormatException ex)
     		{
-    			throw new RuntimeException("Error parsing BarDuration: " + ex.getMessage());
+    			throw new DurationFormatException("Error parsing BarDuration: " + ex.getMessage(), ex);
     		}
     	}
 
@@ -500,5 +501,37 @@ public class Normalizer {
     @FunctionalInterface
     public interface TransformationStrategy {
         String transform(String input);
+    }
+
+    public static class TimestampParseException extends RuntimeException {
+		private static final long serialVersionUID = 4147739777611795160L;
+
+		public TimestampParseException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    public static class ZipFormatException extends RuntimeException {
+		private static final long serialVersionUID = 5779911776777707790L;
+
+		public ZipFormatException(String message) {
+            super(message);
+        }
+    }
+
+    public static class ZipLengthException extends RuntimeException {
+		private static final long serialVersionUID = -7466080156350975480L;
+
+		public ZipLengthException(String message) {
+            super(message);
+        }
+    }
+
+    public static class DurationFormatException extends RuntimeException {
+		private static final long serialVersionUID = 8048001799788440418L;
+
+		public DurationFormatException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 }
