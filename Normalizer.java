@@ -1,4 +1,5 @@
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -305,10 +306,9 @@ public class Normalizer {
     			else
     			{
 	    			TransformationStrategy transformationStrategy = field.getTransformationStrategy();
-	    			//replace invalid UTF-8 encoding with replacement encoding then
-	    			//normalize the text to ensures that combining characters are properly combined with their base characters.
-	    			data[i] = data[i].replaceAll(NON_UNICODE_CHAR, UNICODE_REPLACEMENT_CHAR);
-	    			data[i] = java.text.Normalizer.normalize(data[i], java.text.Normalizer.Form.NFC);
+
+	    			//replace invalid UTF-8 encoding with replacement encoding
+	    			data[i] = validateUtf8Encoding(data[i]);
 
 	    			//apply the corresponding transformation logic
 	                data[i] = transformationStrategy.transform(data[i]);
@@ -458,6 +458,105 @@ public class Normalizer {
     		}
 	        return String.valueOf(localTime.toSecondOfDay());
 	    }
+
+    	/**
+		 * validate the UTF-8 encoding and return the validated text
+		 *
+		 * @param text input text
+		 * @return a string with validated UTF-8 encoding
+		 */
+    	private static String validateUtf8Encoding(String text)
+    	{
+    		byte[] inputBytes = text.getBytes(StandardCharsets.UTF_8);
+
+    		byte[] outputBytes = replaceInvalidUTF8(inputBytes);
+
+    		return new String(outputBytes, StandardCharsets.UTF_8);
+    	}
+
+    	/**
+		 * validate the UTF-8 encoding and return the validated byte array
+		 *
+		 * @param input input byte array
+		 * @return a byte array with validated UTF-8 encoding
+		 */
+    	private static byte[] replaceInvalidUTF8(byte[] input) {
+    	    ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+    	    int index = 0;
+    	    while (index < input.length) {
+    	        int currentByte = input[index] & 0xFF;
+
+    	        if ((currentByte & 0x80) == 0x00) { //if the first 2 bits are '10', it's content, just write the byte
+    	            output.write(currentByte);
+    	            index++;
+    	        } else if ((currentByte & 0xE0) == 0xC0) { //if the first 3 bits are '110', include the next 2 bytes
+    	            if (index + 1 >= input.length) {
+    	                output.write(0xEF);
+    	                output.write(0xBF);
+    	                output.write(0xBD);
+    	                break;
+    	            }
+    	            int byte2 = input[index + 1] & 0xFF;
+    	            if ((byte2 & 0xC0) != 0x80) {
+    	                output.write(0xEF);
+    	                output.write(0xBF);
+    	                output.write(0xBD);
+    	            } else {
+    	                output.write(currentByte);
+    	                output.write(byte2);
+    	            }
+    	            index += 2;
+    	        } else if ((currentByte & 0xF0) == 0xE0) {//if the first 4 bits are '1110', include the next 3 bytes
+    	            if (index + 2 >= input.length) {
+    	                output.write(0xEF);
+    	                output.write(0xBF);
+    	                output.write(0xBD);
+    	                break;
+    	            }
+    	            int byte2 = input[index + 1] & 0xFF;
+    	            int byte3 = input[index + 2] & 0xFF;
+    	            if ((byte2 & 0xC0) != 0x80 || (byte3 & 0xC0) != 0x80) {
+    	                output.write(0xEF);
+    	                output.write(0xBF);
+    	                output.write(0xBD);
+    	            } else {
+    	                output.write(currentByte);
+    	                output.write(byte2);
+    	                output.write(byte3);
+    	            }
+    	            index += 3;
+    	        } else if ((currentByte & 0xF8) == 0xF0) {//if the first 5 bits are '11110', include the next 4 bytes
+    	            if (index + 3 >= input.length) {
+    	                output.write(0xEF);
+    	                output.write(0xBF);
+    	                output.write(0xBD);
+    	                break;
+    	            }
+    	            int byte2 = input[index + 1] & 0xFF;
+    	            int byte3 = input[index + 2] & 0xFF;
+    	            int byte4 = input[index + 3] & 0xFF;
+    	            if ((byte2 & 0xC0) != 0x80 || (byte3 & 0xC0) != 0x80 || (byte4 & 0xC0) != 0x80) {
+    	                output.write(0xEF);
+    	                output.write(0xBF);
+    	                output.write(0xBD);
+    	            } else {
+    	                output.write(currentByte);
+    	                output.write(byte2);
+    	                output.write(byte3);
+    	                output.write(byte4);
+    	            }
+    	            index += 4;
+    	        } else { 				//else it's an invalid encoding, just replace it with replacement characters
+    	            output.write(0xEF);
+    	            output.write(0xBF);
+    	            output.write(0xBD);
+    	            index++;
+    	        }
+    	    }
+
+    	    return output.toByteArray();
+    	}
 
     }
 
