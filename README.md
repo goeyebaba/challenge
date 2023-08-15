@@ -20,7 +20,7 @@ Normalizer.java has a few nested classes, it will generate multiple class files 
 2. If it fails to process a line, it will move on to the next line.
 3. If it fails to process a field, it will stop processing the rest of the line and move on to the next line.
 4. If error count reaches the set maximum (by default it's set to 100), it will stop processing the file.
-5. The source codes are commented in Java Doc style, you can generate Java Doc by running the following command
+5. The source codes are commented in Javadoc style, you can generate Javadoc by running the following command
 
    \>javadoc -d \<output-directory> Normalizer.java
    
