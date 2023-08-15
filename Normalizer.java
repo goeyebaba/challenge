@@ -24,8 +24,6 @@ import java.util.Set;
  */
 public class Normalizer {
 	public static final int MAX_ERROR_COUNT = 100;
-	public static final String NON_UNICODE_CHAR = "[^\\u0000-\\uFFFF]";
-	public static final String UNICODE_REPLACEMENT_CHAR = "\uFFFD";
 	public static final String ZERO_STR = "0";
 
 	/**
